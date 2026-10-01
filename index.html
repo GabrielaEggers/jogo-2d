@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2P Runner - VS Code</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="game-container">
+    <div id="ui">
+      <div class="p1-score">P1 (Vermelho): <span id="score1">0</span>m</div>
+      <div class="p2-score">P2 (Azul): <span id="score2">0</span>m</div>
+    </div>
+
+    <canvas id="gameCanvas" width="900" height="450"></canvas>
+
+    <div id="instructions">
+      <div class="controls-box p1-controls">
+        <h3>Jogador 1</h3>
+        <p><b>W</b> - Pular</p>
+        <p><b>A / D</b> - Esquerda / Direita</p>
+        <p><b>S</b> - Agachar</p>
+      </div>
+      <div class="controls-box p2-controls">
+        <h3>Jogador 2</h3>
+        <p><b>Espaço</b> - Pular</p>
+        <p><b>Setas (← / →)</b> - Esquerda / Direita</p>
+        <p><b>Seta Baixo (↓)</b> - Agachar</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
