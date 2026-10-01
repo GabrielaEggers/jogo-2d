@@ -11,8 +11,9 @@ const overlayTitle = document.getElementById("overlay-title");
 const overlaySubtitle = document.getElementById("overlay-subtitle");
 const startBtn = document.getElementById("startBtn");
 
-// Configurações do Jogo
-let gameSpeed = 7;
+// Configurações Globais e Velocidade
+const INITIAL_SPEED = 6.5;
+let gameSpeed = INITIAL_SPEED;
 let score = 0;
 let level = 1;
 let gameRunning = false;
@@ -106,7 +107,7 @@ class Player {
 
     this.vy = 0;
     this.gravity = 0.85;
-    this.speed = 7.5;
+    this.speed = 8;
 
     this.isJumping = false;
     this.isCrouching = false;
@@ -271,28 +272,27 @@ class Player {
   }
 }
 
-// Classe dos Obstáculos Estilizados
+// Classe dos Obstáculos
 class Obstacle {
   constructor(kind) {
     this.x = canvas.width;
     this.kind = kind;
 
-    // Configuração de tamanho e posição Y por tipo
     switch (this.kind) {
       case "cogumelo_venenoso":
         this.width = 50; this.height = 65; this.y = 585;
         break;
       case "tronco_mágico":
-        this.width = 65; this.height = 50; this.y = 500; // Suspenso (Agachar)
+        this.width = 65; this.height = 50; this.y = 500;
         break;
       case "cacto_gigante":
         this.width = 50; this.height = 80; this.y = 570;
         break;
       case "esfera_espinhos":
-        this.width = 55; this.height = 55; this.y = 495; // Suspenso
+        this.width = 55; this.height = 55; this.y = 495;
         break;
       case "drone_laser":
-        this.width = 60; this.height = 50; this.y = 490; // Suspenso
+        this.width = 60; this.height = 50; this.y = 490;
         break;
       case "barreira_neon":
         this.width = 45; this.height = 75; this.y = 575;
@@ -301,10 +301,10 @@ class Obstacle {
         this.width = 55; this.height = 80; this.y = 570;
         break;
       case "meteorito_fogo":
-        this.width = 60; this.height = 55; this.y = 490; // Suspenso
+        this.width = 60; this.height = 55; this.y = 490;
         break;
       case "alien_flutuante":
-        this.width = 55; this.height = 55; this.y = 490; // Suspenso
+        this.width = 55; this.height = 55; this.y = 490;
         break;
       case "portal_plasma":
         this.width = 50; this.height = 85; this.y = 565;
@@ -327,15 +327,12 @@ class Obstacle {
 
     switch (this.kind) {
       case "cogumelo_venenoso":
-        // Haste
         ctx.fillStyle = "#e2e8f0";
         ctx.fillRect(x + w * 0.35, y + h * 0.4, w * 0.3, h * 0.6);
-        // Chapéu
         ctx.fillStyle = "#a855f7";
         ctx.beginPath();
         ctx.arc(x + w / 2, y + h * 0.4, w / 2, Math.PI, 0);
         ctx.fill();
-        // Pintas Venenosas
         ctx.fillStyle = "#f43f5e";
         ctx.beginPath();
         ctx.arc(x + w * 0.3, y + h * 0.25, 4, 0, Math.PI * 2);
@@ -348,7 +345,6 @@ class Obstacle {
         ctx.beginPath();
         ctx.roundRect(x, y, w, h, 8);
         ctx.fill();
-        // Runas Brilhantes
         ctx.fillStyle = "#38bdf8";
         ctx.fillRect(x + 10, y + 15, 12, 5);
         ctx.fillRect(x + 35, y + 28, 15, 5);
@@ -359,7 +355,6 @@ class Obstacle {
         ctx.beginPath();
         ctx.roundRect(x + w * 0.3, y, w * 0.4, h, 8);
         ctx.fill();
-        // Braços
         ctx.beginPath();
         ctx.roundRect(x, y + 25, w * 0.35, 12, 4);
         ctx.roundRect(x, y + 10, 10, 20, 4);
@@ -369,12 +364,10 @@ class Obstacle {
         break;
 
       case "esfera_espinhos":
-        // Bola do Caos
         ctx.fillStyle = "#b45309";
         ctx.beginPath();
         ctx.arc(x + w / 2, y + h / 2, w / 3, 0, Math.PI * 2);
         ctx.fill();
-        // Espinhos
         ctx.strokeStyle = "#78350f";
         ctx.lineWidth = 4;
         for (let i = 0; i < 8; i++) {
@@ -387,17 +380,14 @@ class Obstacle {
         break;
 
       case "drone_laser":
-        // Corpo do Robot
         ctx.fillStyle = "#64748b";
         ctx.beginPath();
         ctx.roundRect(x, y + 10, w, h - 20, 8);
         ctx.fill();
-        // Olho Vermelho
         ctx.fillStyle = "#ef4444";
         ctx.beginPath();
         ctx.arc(x + w / 2, y + h / 2, 7, 0, Math.PI * 2);
         ctx.fill();
-        // Laser abaixo
         ctx.strokeStyle = "rgba(239, 68, 68, 0.6)";
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -432,12 +422,10 @@ class Obstacle {
         break;
 
       case "meteorito_fogo":
-        // Meteoro flutuante
         ctx.fillStyle = "#f97316";
         ctx.beginPath();
         ctx.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2);
         ctx.fill();
-        // Cauda de Fogo
         ctx.fillStyle = "#ef4444";
         ctx.beginPath();
         ctx.moveTo(x + w * 0.7, y + 5);
@@ -447,12 +435,10 @@ class Obstacle {
         break;
 
       case "alien_flutuante":
-        // Nave / Alien
         ctx.fillStyle = "#a855f7";
         ctx.beginPath();
         ctx.ellipse(x + w / 2, y + h / 2 + 5, w / 2, 12, 0, 0, Math.PI * 2);
         ctx.fill();
-        // Cúpula
         ctx.fillStyle = "#38bdf8";
         ctx.beginPath();
         ctx.arc(x + w / 2, y + h / 2 - 2, 14, Math.PI, 0);
@@ -498,19 +484,17 @@ function checkCollision(player, obstacle) {
   );
 }
 
-// Desenhar Cenários Ricos conforme o Nível
+// Renderização dos Cenários
 function drawBackground() {
   globalAnimTime++;
 
   if (level === 1) {
-    // FASE 1: Floresta Mágica
     let sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
     sky.addColorStop(0, "#0284c7");
     sky.addColorStop(1, "#bae6fd");
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Montanhas
     bgOffset1 -= gameSpeed * 0.15;
     if (bgOffset1 <= -600) bgOffset1 = 0;
     ctx.fillStyle = "#334155";
@@ -522,7 +506,6 @@ function drawBackground() {
       ctx.fill();
     }
 
-    // Árvores Mágicas
     bgOffset2 -= gameSpeed * 0.4;
     if (bgOffset2 <= -300) bgOffset2 = 0;
     for (let i = 0; i < 6; i++) {
@@ -535,25 +518,21 @@ function drawBackground() {
       ctx.fill();
     }
 
-    // Chão
     ctx.fillStyle = "#16a34a";
     ctx.fillRect(0, 650, canvas.width, 70);
 
   } else if (level === 2) {
-    // FASE 2: Deserto das Ruínas
     let sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
     sky.addColorStop(0, "#ea580c");
     sky.addColorStop(1, "#fef08a");
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Sol Gigante
     ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
     ctx.beginPath();
     ctx.arc(1000, 180, 90, 0, Math.PI * 2);
     ctx.fill();
 
-    // Dunas
     bgOffset1 -= gameSpeed * 0.15;
     if (bgOffset1 <= -600) bgOffset1 = 0;
     ctx.fillStyle = "#c2410c";
@@ -563,7 +542,6 @@ function drawBackground() {
       ctx.fill();
     }
 
-    // Pirâmides ao fundo
     bgOffset2 -= gameSpeed * 0.3;
     if (bgOffset2 <= -500) bgOffset2 = 0;
     ctx.fillStyle = "#b45309";
@@ -576,16 +554,13 @@ function drawBackground() {
       ctx.fill();
     }
 
-    // Chão
     ctx.fillStyle = "#d97706";
     ctx.fillRect(0, 650, canvas.width, 70);
 
   } else if (level === 3) {
-    // FASE 3: Cidade Cyberpunk
     ctx.fillStyle = "#090d16";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Prédios com Luzes Neon
     bgOffset1 -= gameSpeed * 0.2;
     if (bgOffset1 <= -400) bgOffset1 = 0;
     for (let i = 0; i < 5; i++) {
@@ -593,7 +568,6 @@ function drawBackground() {
       ctx.fillStyle = "#1e1b4b";
       ctx.fillRect(bx, 180, 180, 470);
 
-      // Janelas Neon
       ctx.fillStyle = "#06b6d4";
       for (let j = 0; j < 8; j++) {
         ctx.fillRect(bx + 20, 210 + j * 50, 30, 20);
@@ -601,18 +575,15 @@ function drawBackground() {
       }
     }
 
-    // Chão
     ctx.fillStyle = "#020617";
     ctx.fillRect(0, 650, canvas.width, 70);
     ctx.fillStyle = "#ec4899";
     ctx.fillRect(0, 650, canvas.width, 4);
 
   } else if (level === 4) {
-    // FASE 4: Caverna de Lava
     ctx.fillStyle = "#1c0a00";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Estalactites Teto
     ctx.fillStyle = "#451a03";
     for (let i = 0; i < 15; i++) {
       ctx.beginPath();
@@ -622,7 +593,6 @@ function drawBackground() {
       ctx.fill();
     }
 
-    // Montanhas de Rocha
     bgOffset1 -= gameSpeed * 0.2;
     if (bgOffset1 <= -600) bgOffset1 = 0;
     ctx.fillStyle = "#290d00";
@@ -634,18 +604,15 @@ function drawBackground() {
       ctx.fill();
     }
 
-    // Chão de Magma
     ctx.fillStyle = "#9a3412";
     ctx.fillRect(0, 650, canvas.width, 70);
     ctx.fillStyle = "#f97316";
     ctx.fillRect(0, 650, canvas.width, 8);
 
   } else {
-    // FASE 5: Estação Espacial
     ctx.fillStyle = "#030712";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Estrelas piscando
     ctx.fillStyle = "#ffffff";
     for (let i = 0; i < 50; i++) {
       let sx = (i * 87) % canvas.width;
@@ -654,20 +621,17 @@ function drawBackground() {
       ctx.fillRect(sx, sy, size, size);
     }
 
-    // Planeta no fundo
     ctx.fillStyle = "#6366f1";
     ctx.beginPath();
     ctx.arc(200, 200, 110, 0, Math.PI * 2);
     ctx.fill();
 
-    // Anel do Planeta
     ctx.strokeStyle = "rgba(165, 180, 252, 0.6)";
     ctx.lineWidth = 12;
     ctx.beginPath();
     ctx.ellipse(200, 200, 180, 40, Math.PI / 6, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Chão Metálico Espacial
     ctx.fillStyle = "#1e293b";
     ctx.fillRect(0, 650, canvas.width, 70);
     ctx.fillStyle = "#38bdf8";
@@ -679,7 +643,7 @@ function drawBackground() {
 function startGame() {
   score = 0;
   level = 1;
-  gameSpeed = 7;
+  gameSpeed = INITIAL_SPEED;
   gameOver = false;
   gameRunning = true;
   obstacles = [];
@@ -720,9 +684,10 @@ function gameLoop() {
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
 
-  // Pontuação e Progressão de Fases
-  score += 0.1;
-  gameSpeed += 0.0007;
+  // AUMENTO PROGRESSIVO DA VELOCIDADE DO JOGO
+  // A cada quadro a velocidade aumenta continuamente
+  gameSpeed += 0.0025;
+  score += 0.1 * (gameSpeed / INITIAL_SPEED);
 
   // Lógica de Troca de Fases
   if (score >= 1200) {
@@ -749,9 +714,10 @@ function gameLoop() {
   player2.update();
   player2.draw();
 
-  // Gerar Obstáculos
+  // Gerar Obstáculos (adaptado à nova velocidade)
   obstacleTimer++;
-  if (obstacleTimer > Math.max(38, 90 - gameSpeed * 3)) {
+  const spawnThreshold = Math.max(30, 110 - gameSpeed * 4.5);
+  if (obstacleTimer > spawnThreshold) {
     const availableKinds = OBSTACLE_TYPES[level];
     const randomKind = availableKinds[Math.floor(Math.random() * availableKinds.length)];
     obstacles.push(new Obstacle(randomKind));
