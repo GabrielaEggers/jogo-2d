@@ -3,16 +3,34 @@ const ctx = canvas.getContext("2d");
 
 const score1El = document.getElementById("score1");
 const score2El = document.getElementById("score2");
+const levelEl = document.getElementById("level");
+
+const overlay = document.getElementById("overlay");
+const overlayTitle = document.getElementById("overlay-title");
+const overlaySubtitle = document.getElementById("overlay-subtitle");
+const startBtn = document.getElementById("startBtn");
 
 // Configurações do Jogo
-let gameSpeed = 6;
+let gameSpeed = 7;
 let score = 0;
+let level = 1;
+let gameRunning = false;
 let gameOver = false;
+
 let bgOffset1 = 0;
 let bgOffset2 = 0;
 let particles = [];
+let obstacles = [];
+let obstacleTimer = 0;
 
-// Controle de Teclas
+// Tipos de Obstáculos por Fase
+const OBSTACLE_TYPES = {
+  1: ["stone", "log"],                           // Fase 1: Floresta (Pedras e Troncos)
+  2: ["cactus", "tumbleweed"],                  // Fase 2: Deserto (Cactos e Arbusto)
+  3: ["iceberg", "stalagmite", "floating_ice"]  // Fase 3: Gelo (Icebergs, Estalagmites e Placas)
+};
+
+// Mapeamento de Teclas
 const keys = {};
 
 window.addEventListener("keydown", (e) => {
@@ -26,15 +44,15 @@ window.addEventListener("keyup", (e) => {
   keys[e.code] = false;
 });
 
-// Partículas de Poeira e Colisão
+// Partículas
 class Particle {
   constructor(x, y, color) {
     this.x = x;
     this.y = y;
     this.color = color;
-    this.size = Math.random() * 4 + 2;
-    this.speedX = (Math.random() - 0.5) * 2 - gameSpeed * 0.3;
-    this.speedY = (Math.random() - 0.5) * 1.5;
+    this.size = Math.random() * 5 + 2;
+    this.speedX = (Math.random() - 0.5) * 3 - gameSpeed * 0.3;
+    this.speedY = (Math.random() - 0.5) * 2;
     this.alpha = 1;
   }
 
@@ -55,15 +73,15 @@ class Particle {
   }
 }
 
-// Classe do Jogador 2D Lateral
+// Jogador
 class Player {
   constructor(x, gender, shirtColor, hairColor, controls) {
     this.startX = x;
     this.x = x;
-    this.baseY = 350;
+    this.baseY = 560; // Ajustado para resolução 1280x720
     this.y = this.baseY;
-    this.width = 30;
-    this.height = 68;
+    this.width = 40;
+    this.height = 90;
 
     this.gender = gender;
     this.shirtColor = shirtColor;
@@ -73,8 +91,8 @@ class Player {
     this.controls = controls;
 
     this.vy = 0;
-    this.gravity = 0.75;
-    this.speed = 5;
+    this.gravity = 0.85;
+    this.speed = 7;
 
     this.isJumping = false;
     this.isCrouching = false;
@@ -83,53 +101,62 @@ class Player {
     this.animFrame = 0;
   }
 
+  reset() {
+    this.x = this.startX;
+    this.y = this.baseY;
+    this.height = 90;
+    this.vy = 0;
+    this.isJumping = false;
+    this.isCrouching = false;
+    this.alive = true;
+  }
+
   update() {
     if (!this.alive) return;
 
     // Pulo
     if (keys[this.controls.jump] && !this.isJumping) {
-      this.vy = -14.5;
+      this.vy = -18;
       this.isJumping = true;
     }
 
     // Agachar
     if (keys[this.controls.crouch] && !this.isJumping) {
       this.isCrouching = true;
-      this.height = 38;
-      this.y = this.baseY + 30;
+      this.height = 50;
+      this.y = this.baseY + 40;
     } else {
       if (this.isCrouching) {
-        this.height = 68;
+        this.height = 90;
         this.y = this.baseY;
         this.isCrouching = false;
       }
     }
 
-    // Movimentação Lateral
+    // Movimentação
     if (keys[this.controls.left]) this.x -= this.speed;
     if (keys[this.controls.right]) this.x += this.speed;
 
     // Limites de tela
-    if (this.x < 10) this.x = 10;
-    if (this.x + this.width > canvas.width - 10) this.x = canvas.width - this.width - 10;
+    if (this.x < 20) this.x = 20;
+    if (this.x + this.width > canvas.width - 20) this.x = canvas.width - this.width - 20;
 
     // Gravidade
     this.y += this.vy;
     this.vy += this.gravity;
 
-    const currentBaseY = this.isCrouching ? this.baseY + 30 : this.baseY;
+    const currentBaseY = this.isCrouching ? this.baseY + 40 : this.baseY;
     if (this.y >= currentBaseY) {
       this.y = currentBaseY;
       this.vy = 0;
       this.isJumping = false;
 
-      // Poeira ao correr no chão
       if (Math.random() > 0.4) {
-        particles.push(new Particle(this.x + 5, 418, "rgba(200, 180, 150, 0.6)"));
+        particles.push(new Particle(this.x + 10, 650, "rgba(200, 180, 150, 0.6)"));
       }
     }
 
-    this.animFrame += gameSpeed * 0.08;
+    this.animFrame += gameSpeed * 0.06;
   }
 
   draw() {
@@ -137,128 +164,162 @@ class Player {
 
     const px = this.x;
     const py = this.y;
-    const swing = Math.sin(this.animFrame) * (this.isJumping ? 0.2 : 0.7);
+    const swing = Math.sin(this.animFrame) * (this.isJumping ? 0.2 : 0.8);
 
-    // Sombra suave no chão
+    // Sombra
     ctx.save();
     ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
     ctx.beginPath();
-    ctx.ellipse(px + 15, 420, 20, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(px + 20, 652, 25, 7, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
     if (this.isCrouching) {
-      // --- PERSONAGEM AGACHADO 2D ---
-      let shirtGrad = ctx.createLinearGradient(px, py + 15, px + 25, py + 30);
+      // Agachado
+      let shirtGrad = ctx.createLinearGradient(px, py + 20, px + 35, py + 40);
       shirtGrad.addColorStop(0, this.shirtColor);
       shirtGrad.addColorStop(1, "#111");
       ctx.fillStyle = shirtGrad;
       ctx.beginPath();
-      ctx.roundRect(px + 5, py + 15, 24, 15, 4);
+      ctx.roundRect(px + 5, py + 20, 32, 22, 6);
       ctx.fill();
 
-      // Cabeça
       ctx.fillStyle = this.skinColor;
       ctx.beginPath();
-      ctx.arc(px + 20, py + 8, 9, 0, Math.PI * 2);
+      ctx.arc(px + 25, py + 12, 12, 0, Math.PI * 2);
       ctx.fill();
 
-      // Cabelo
       ctx.fillStyle = this.hairColor;
       ctx.beginPath();
-      ctx.arc(px + 17, py + 5, 9, Math.PI * 0.8, Math.PI * 2.1);
+      ctx.arc(px + 22, py + 8, 12, Math.PI * 0.8, Math.PI * 2.1);
       ctx.fill();
 
-      // Pernas Dobradas
       ctx.fillStyle = this.pantsColor;
       ctx.beginPath();
-      ctx.roundRect(px + 2, py + 28, 26, 10, 3);
+      ctx.roundRect(px + 2, py + 38, 36, 14, 4);
       ctx.fill();
     } else {
-      // --- PERSONAGEM EM PÉ / CORRENDO 2D ---
-
-      // 1. Cabelo Longo (Feminino)
+      // Em pé
       if (this.gender === "female") {
         ctx.fillStyle = this.hairColor;
         ctx.beginPath();
-        ctx.arc(px + 4 - Math.sin(swing) * 5, py + 15, 7, 0, Math.PI * 2);
+        ctx.arc(px + 5 - Math.sin(swing) * 6, py + 20, 9, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // 2. Pernas Articuladas
-      ctx.lineWidth = 6;
+      ctx.lineWidth = 8;
       ctx.lineCap = "round";
       ctx.strokeStyle = this.pantsColor;
 
       // Perna Traseira
       ctx.beginPath();
-      ctx.moveTo(px + 15, py + 38);
-      ctx.lineTo(px + 15 - Math.sin(swing) * 16, py + 52);
-      ctx.lineTo(px + 15 - Math.sin(swing) * 16 + 5, py + 63);
+      ctx.moveTo(px + 20, py + 50);
+      ctx.lineTo(px + 20 - Math.sin(swing) * 20, py + 70);
+      ctx.lineTo(px + 20 - Math.sin(swing) * 20 + 6, py + 86);
       ctx.stroke();
 
       // Perna Dianteira
       ctx.beginPath();
-      ctx.moveTo(px + 15, py + 38);
-      ctx.lineTo(px + 15 + Math.sin(swing) * 16, py + 52);
-      ctx.lineTo(px + 15 + Math.sin(swing) * 16 + 5, py + 63);
+      ctx.moveTo(px + 20, py + 50);
+      ctx.lineTo(px + 20 + Math.sin(swing) * 20, py + 70);
+      ctx.lineTo(px + 20 + Math.sin(swing) * 20 + 6, py + 86);
       ctx.stroke();
 
       // Sapatos
       ctx.fillStyle = "#111";
-      ctx.fillRect(px + 15 - Math.sin(swing) * 16 + 3, py + 61, 8, 5);
-      ctx.fillRect(px + 15 + Math.sin(swing) * 16 + 3, py + 61, 8, 5);
+      ctx.fillRect(px + 20 - Math.sin(swing) * 20 + 4, py + 83, 10, 7);
+      ctx.fillRect(px + 20 + Math.sin(swing) * 20 + 4, py + 83, 10, 7);
 
-      // 3. Tronco e Camisa
-      let shirtGrad = ctx.createLinearGradient(px + 8, py + 18, px + 22, py + 38);
+      // Tronco
+      let shirtGrad = ctx.createLinearGradient(px + 10, py + 25, px + 30, py + 50);
       shirtGrad.addColorStop(0, this.shirtColor);
       shirtGrad.addColorStop(1, "#0f172a");
       ctx.fillStyle = shirtGrad;
       ctx.beginPath();
-      ctx.roundRect(px + 7, py + 18, 16, 22, 4);
+      ctx.roundRect(px + 9, py + 24, 22, 28, 6);
       ctx.fill();
 
-      // 4. Cabeça
+      // Cabeça
       ctx.fillStyle = this.skinColor;
       ctx.beginPath();
-      ctx.arc(px + 15, py + 10, 10, 0, Math.PI * 2);
+      ctx.arc(px + 20, py + 14, 13, 0, Math.PI * 2);
       ctx.fill();
 
       // Cabelo
       ctx.fillStyle = this.hairColor;
       ctx.beginPath();
-      ctx.arc(px + 14, py + 8, 10.5, Math.PI * 0.75, Math.PI * 1.95);
+      ctx.arc(px + 18, py + 11, 13.5, Math.PI * 0.75, Math.PI * 1.95);
       ctx.fill();
 
       // Olho
       ctx.fillStyle = "#0f172a";
-      ctx.fillRect(px + 20, py + 8, 2, 3);
+      ctx.fillRect(px + 26, py + 11, 3, 4);
 
-      // 5. Braços
+      // Braços
       ctx.strokeStyle = this.skinColor;
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 6;
 
       ctx.beginPath();
-      ctx.moveTo(px + 15, py + 21);
-      ctx.lineTo(px + 15 - Math.cos(swing) * 14, py + 33);
+      ctx.moveTo(px + 20, py + 28);
+      ctx.lineTo(px + 20 - Math.cos(swing) * 18, py + 44);
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.moveTo(px + 15, py + 21);
-      ctx.lineTo(px + 15 + Math.cos(swing) * 14, py + 33);
+      ctx.moveTo(px + 20, py + 28);
+      ctx.lineTo(px + 20 + Math.cos(swing) * 18, py + 44);
       ctx.stroke();
     }
   }
 }
 
-// Obstáculos em 2D Lateral
+// Obstáculos Variados por Fase
 class Obstacle {
-  constructor() {
+  constructor(kind) {
     this.x = canvas.width;
-    this.type = Math.random() > 0.4 ? "ground" : "air"; // Ground = Pular, Air = Agachar
-    this.width = 38;
-    this.height = this.type === "ground" ? 48 : 38;
-    this.y = this.type === "ground" ? 372 : 305;
+    this.kind = kind;
+
+    // Configuração baseada no tipo de obstáculo
+    switch (this.kind) {
+      case "stone":
+        this.width = 50;
+        this.height = 60;
+        this.y = 590;
+        break;
+      case "log":
+        this.width = 55;
+        this.height = 50;
+        this.y = 500; // Necessita agachar
+        break;
+      case "cactus":
+        this.width = 45;
+        this.height = 75;
+        this.y = 575;
+        break;
+      case "tumbleweed":
+        this.width = 50;
+        this.height = 50;
+        this.y = 500; // Necessita agachar
+        break;
+      case "iceberg":
+        this.width = 60;
+        this.height = 80;
+        this.y = 570;
+        break;
+      case "stalagmite":
+        this.width = 45;
+        this.height = 65;
+        this.y = 585;
+        break;
+      case "floating_ice":
+        this.width = 65;
+        this.height = 45;
+        this.y = 505; // Necessita agachar
+        break;
+      default:
+        this.width = 50;
+        this.height = 60;
+        this.y = 590;
+    }
   }
 
   update() {
@@ -266,49 +327,84 @@ class Obstacle {
   }
 
   draw() {
-    if (this.type === "ground") {
-      // Pedra no Chão
-      let rockGrad = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
-      rockGrad.addColorStop(0, "#94a3b8");
-      rockGrad.addColorStop(1, "#1e293b");
+    ctx.save();
+    switch (this.kind) {
+      case "stone":
+        ctx.fillStyle = "#64748b";
+        ctx.beginPath();
+        ctx.roundRect(this.x, this.y, this.width, this.height, 8);
+        ctx.fill();
+        break;
 
-      ctx.fillStyle = rockGrad;
-      ctx.beginPath();
-      ctx.roundRect(this.x, this.y, this.width, this.height, 6);
-      ctx.fill();
-    } else {
-      // Tronco Aéreo / Suspenso
-      let woodGrad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
-      woodGrad.addColorStop(0, "#d97706");
-      woodGrad.addColorStop(1, "#451a03");
+      case "log":
+        ctx.fillStyle = "#78350f";
+        ctx.beginPath();
+        ctx.roundRect(this.x, this.y, this.width, this.height, 6);
+        ctx.fill();
+        break;
 
-      ctx.fillStyle = woodGrad;
-      ctx.beginPath();
-      ctx.roundRect(this.x, this.y, this.width, this.height, 6);
-      ctx.fill();
+      case "cactus":
+        ctx.fillStyle = "#15803d";
+        ctx.beginPath();
+        ctx.roundRect(this.x, this.y, this.width, this.height, 10);
+        ctx.fill();
+        // Espinhos/Braços
+        ctx.fillRect(this.x - 8, this.y + 20, 10, 15);
+        ctx.fillRect(this.x + this.width - 2, this.y + 35, 10, 15);
+        break;
+
+      case "tumbleweed":
+        ctx.fillStyle = "#d97706";
+        ctx.beginPath();
+        ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+
+      case "iceberg":
+        ctx.fillStyle = "#38bdf8";
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.height);
+        ctx.lineTo(this.x + this.width / 2, this.y);
+        ctx.lineTo(this.x + this.width, this.y + this.height);
+        ctx.fill();
+        break;
+
+      case "stalagmite":
+        ctx.fillStyle = "#e2e8f0";
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y + this.height);
+        ctx.lineTo(this.x + this.width / 2, this.y);
+        ctx.lineTo(this.x + this.width, this.y + this.height);
+        ctx.fill();
+        break;
+
+      case "floating_ice":
+        ctx.fillStyle = "#bae6fd";
+        ctx.beginPath();
+        ctx.roundRect(this.x, this.y, this.width, this.height, 5);
+        ctx.fill();
+        break;
     }
+    ctx.restore();
   }
 }
 
 // Instâncias dos Jogadores
-const player1 = new Player(120, "female", "#ec4899", "#3b0764", {
+const player1 = new Player(180, "female", "#ec4899", "#3b0764", {
   jump: "KeyW",
   crouch: "KeyS",
   left: "KeyA",
   right: "KeyD"
 });
 
-const player2 = new Player(180, "male", "#0284c7", "#eab308", {
+const player2 = new Player(260, "male", "#0284c7", "#eab308", {
   jump: "ArrowUp",
   crouch: "ArrowDown",
   left: "ArrowLeft",
   right: "ArrowRight"
 });
 
-let obstacles = [];
-let obstacleTimer = 0;
-
-// Checagem de Colisão AABB
+// Colisão AABB
 function checkCollision(player, obstacle) {
   return (
     player.x < obstacle.x + obstacle.width &&
@@ -318,82 +414,116 @@ function checkCollision(player, obstacle) {
   );
 }
 
-// Renderização do Fundo 2D com Parallax
+// Desenhar Cenário conforme a Fase
 function drawBackground() {
-  // Céu
-  let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  skyGrad.addColorStop(0, "#0284c7");
-  skyGrad.addColorStop(0.6, "#38bdf8");
-  skyGrad.addColorStop(1, "#bae6fd");
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (level === 1) {
+    // Fase 1: Floresta
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    skyGrad.addColorStop(0, "#0284c7");
+    skyGrad.addColorStop(1, "#bae6fd");
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Sol
-  ctx.fillStyle = "#fef08a";
-  ctx.beginPath();
-  ctx.arc(750, 80, 40, 0, Math.PI * 2);
-  ctx.fill();
+    // Montanhas
+    bgOffset1 -= gameSpeed * 0.15;
+    if (bgOffset1 <= -600) bgOffset1 = 0;
+    ctx.fillStyle = "#64748b";
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(bgOffset1 + i * 600, 650);
+      ctx.lineTo(bgOffset1 + i * 600 + 300, 250);
+      ctx.lineTo(bgOffset1 + i * 600 + 600, 650);
+      ctx.fill();
+    }
 
-  // Camada 1: Montanhas Distantes (Parallax Lento)
-  bgOffset1 -= gameSpeed * 0.15;
-  if (bgOffset1 <= -450) bgOffset1 = 0;
-
-  ctx.fillStyle = "#64748b";
-  for (let i = 0; i < 3; i++) {
-    ctx.beginPath();
-    ctx.moveTo(bgOffset1 + i * 450, 420);
-    ctx.lineTo(bgOffset1 + i * 450 + 225, 180);
-    ctx.lineTo(bgOffset1 + i * 450 + 450, 420);
-    ctx.fill();
-  }
-
-  // Camada 2: Árvores em 2D (Parallax Médio)
-  bgOffset2 -= gameSpeed * 0.4;
-  if (bgOffset2 <= -200) bgOffset2 = 0;
-
-  for (let i = 0; i < 6; i++) {
-    let treeX = bgOffset2 + i * 200 + 20;
-
-    // Tronco
-    ctx.fillStyle = "#78350f";
-    ctx.fillRect(treeX + 14, 260, 12, 160);
-
-    // Folhagem
+    // Chão
     ctx.fillStyle = "#15803d";
-    ctx.beginPath();
-    ctx.arc(treeX + 20, 240, 35, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(0, 650, canvas.width, 70);
+
+  } else if (level === 2) {
+    // Fase 2: Deserto
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    skyGrad.addColorStop(0, "#f97316");
+    skyGrad.addColorStop(1, "#fef08a");
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Dunas
+    bgOffset1 -= gameSpeed * 0.15;
+    if (bgOffset1 <= -600) bgOffset1 = 0;
+    ctx.fillStyle = "#ea580c";
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc(bgOffset1 + i * 600 + 300, 750, 400, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Chão
+    ctx.fillStyle = "#d97706";
+    ctx.fillRect(0, 650, canvas.width, 70);
+
+  } else {
+    // Fase 3: Neve / Gelo
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    skyGrad.addColorStop(0, "#0f172a");
+    skyGrad.addColorStop(1, "#38bdf8");
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Montanhas Geladas
+    bgOffset1 -= gameSpeed * 0.15;
+    if (bgOffset1 <= -600) bgOffset1 = 0;
+    ctx.fillStyle = "#94a3b8";
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(bgOffset1 + i * 600, 650);
+      ctx.lineTo(bgOffset1 + i * 600 + 300, 200);
+      ctx.lineTo(bgOffset1 + i * 600 + 600, 650);
+      ctx.fill();
+    }
+
+    // Chão
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillRect(0, 650, canvas.width, 70);
   }
+}
 
-  // Chão
-  ctx.fillStyle = "#334155";
-  ctx.fillRect(0, 420, canvas.width, 60);
+// Iniciar/Reiniciar o Jogo
+function startGame() {
+  score = 0;
+  level = 1;
+  gameSpeed = 7;
+  gameOver = false;
+  gameRunning = true;
+  obstacles = [];
+  particles = [];
+  obstacleTimer = 0;
 
-  // Faixa do topo do chão
-  ctx.fillStyle = "#22c55e";
-  ctx.fillRect(0, 420, canvas.width, 6);
+  player1.reset();
+  player2.reset();
+
+  overlay.style.display = "none";
+  gameLoop();
+}
+
+// Fim de Jogo
+function triggerGameOver() {
+  gameOver = true;
+  gameRunning = false;
+
+  overlayTitle.textContent = "FIM DE JOGO!";
+  overlaySubtitle.textContent = `Você alcançou a Fase ${level} com ${Math.floor(score)} pontos!`;
+  startBtn.textContent = "REINICIAR JOGO";
+  overlay.style.display = "flex";
 }
 
 // Loop Principal
 function gameLoop() {
-  if (gameOver) {
-    ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = "#f59e0b";
-    ctx.font = "bold 42px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("FIM DE JOGO!", canvas.width / 2, canvas.height / 2 - 20);
-
-    ctx.fillStyle = "#f8fafc";
-    ctx.font = "18px sans-serif";
-    ctx.fillText("Pressione F5 para jogar novamente", canvas.width / 2, canvas.height / 2 + 30);
-    return;
-  }
+  if (!gameRunning) return;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Renderiza Cenário
+  // Fundo
   drawBackground();
 
   // Partículas
@@ -403,12 +533,22 @@ function gameLoop() {
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
 
-  // Pontuação e Velocidade
+  // Pontuação e Progressão de Fases
   score += 0.1;
-  gameSpeed += 0.0006;
+  gameSpeed += 0.0008;
 
-  if (player1.alive) score1El.textContent = Math.floor(score);
-  if (player2.alive) score2El.textContent = Math.floor(score);
+  // Lógica de Fases
+  if (score >= 600) {
+    level = 3;
+  } else if (score >= 300) {
+    level = 2;
+  } else {
+    level = 1;
+  }
+
+  score1El.textContent = Math.floor(score);
+  score2El.textContent = Math.floor(score);
+  levelEl.textContent = level;
 
   // Jogadores
   player1.update();
@@ -417,10 +557,12 @@ function gameLoop() {
   player2.update();
   player2.draw();
 
-  // Obstáculos
+  // Gerar Obstáculos por Fase
   obstacleTimer++;
-  if (obstacleTimer > Math.max(48, 105 - gameSpeed * 3.5)) {
-    obstacles.push(new Obstacle());
+  if (obstacleTimer > Math.max(40, 95 - gameSpeed * 3)) {
+    const availableKinds = OBSTACLE_TYPES[level];
+    const randomKind = availableKinds[Math.floor(Math.random() * availableKinds.length)];
+    obstacles.push(new Obstacle(randomKind));
     obstacleTimer = 0;
   }
 
@@ -437,12 +579,14 @@ function gameLoop() {
     }
   }
 
-  // Fim do jogo se ambos morrerem
+  // Fim do Jogo se ambos morrerem
   if (!player1.alive && !player2.alive) {
-    gameOver = true;
+    triggerGameOver();
+    return;
   }
 
   requestAnimationFrame(gameLoop);
 }
 
-gameLoop();
+// Evento do Botão Iniciar/Reiniciar
+startBtn.addEventListener("click", startGame);

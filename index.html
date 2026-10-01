@@ -3,33 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jungle Runner 2P</title>
+  <title>Runner 2D - Fases e Co-op</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
   <div id="game-container">
-    <div id="ui">
-      <div class="p1-card">P1 (Verde): <span id="score1">0</span>m</div>
-      <div class="title">TEMPLE RUNNER 2D</div>
-      <div class="p2-card">P2 (Azul): <span id="score2">0</span>m</div>
+    <div id="hud">
+      <div class="score-box p1-score">P1: <span id="score1">0</span></div>
+      <div class="level-box">FASE <span id="level">1</span></div>
+      <div class="score-box p2-score">P2: <span id="score2">0</span></div>
     </div>
 
-    <canvas id="gameCanvas" width="900" height="480"></canvas>
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
 
-    <div id="instructions">
-      <div class="controls-box p1-controls">
-        <h3>Jogador 1</h3>
-        <p><b>W</b> - Pular</p>
-        <p><b>A / D</b> - Esquerda / Direita</p>
-        <p><b>S</b> - Agachar</p>
-      </div>
-      <div class="controls-box p2-controls">
-        <h3>Jogador 2</h3>
-        <p><b>Seta Cima (↑)</b> - Pular</p>
-        <p><b>Setas (← / →)</b> - Esquerda / Direita</p>
-        <p><b>Seta Baixo (↓)</b> - Agachar</p>
-      </div>
+    <div id="overlay">
+      <h1 id="overlay-title">RUNNER 2D</h1>
+      <p id="overlay-subtitle">Pressione o botão para iniciar a corrida!</p>
+      <button id="startBtn">INICIAR JOGO</button>
     </div>
   </div>
 
