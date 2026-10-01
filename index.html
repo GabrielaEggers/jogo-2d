@@ -3,23 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Runner 2D - Fases e Co-op</title>
+  <title>Runner 2D - Universos & Obstáculos Estilizados</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="game-container">
     <div id="hud">
       <div class="score-box p1-score">P1: <span id="score1">0</span></div>
-      <div class="level-box">FASE <span id="level">1</span></div>
+      <div class="level-box">
+        <span id="zone-name">FLORESTA MÁGICA</span>
+        <div id="level-num">FASE <span id="level">1</span></div>
+      </div>
       <div class="score-box p2-score">P2: <span id="score2">0</span></div>
     </div>
 
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
 
     <div id="overlay">
-      <h1 id="overlay-title">RUNNER 2D</h1>
-      <p id="overlay-subtitle">Pressione o botão para iniciar a corrida!</p>
-      <button id="startBtn">INICIAR JOGO</button>
+      <h1 id="overlay-title">RUNNER MULTIVERSO</h1>
+      <p id="overlay-subtitle">Atravesse 5 dimensões com obstáculos únicos!</p>
+      <button id="startBtn">INICIAR CORRIDA</button>
     </div>
   </div>
 
