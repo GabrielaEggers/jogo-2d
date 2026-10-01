@@ -4,18 +4,15 @@ const ctx = canvas.getContext("2d");
 const score1El = document.getElementById("score1");
 const score2El = document.getElementById("score2");
 
-// Configurações Globais
-let gameSpeed = 0.015; // Velocidade em profundidade (Z)
+// Configurações do Jogo
+let gameSpeed = 6;
 let score = 0;
 let gameOver = false;
-let roadZ = 0;
+let bgOffset1 = 0;
+let bgOffset2 = 0;
 let particles = [];
 
-// Geometria da Perspectiva
-const HORIZON_Y = 220; // Altura da linha do horizonte
-const FOV = 250;       // Distância focal (campo de visão)
-
-// Mapeamento de Teclas
+// Controle de Teclas
 const keys = {};
 
 window.addEventListener("keydown", (e) => {
@@ -29,24 +26,16 @@ window.addEventListener("keyup", (e) => {
   keys[e.code] = false;
 });
 
-// Projeção 3D para 2D no Canvas
-function project(x, y, z) {
-  const scale = FOV / (FOV + z);
-  const x2d = (x * scale) + canvas.width / 2;
-  const y2d = (y * scale) + HORIZON_Y;
-  return { x: x2d, y: y2d, scale: scale };
-}
-
-// Classe de Partículas (Poeira da Pista)
+// Partículas de Poeira e Colisão
 class Particle {
   constructor(x, y, color) {
     this.x = x;
     this.y = y;
     this.color = color;
-    this.size = Math.random() * 5 + 2;
-    this.speedX = (Math.random() - 0.5) * 2;
-    this.speedY = Math.random() * -2 - 1;
-    this.alpha = 0.8;
+    this.size = Math.random() * 4 + 2;
+    this.speedX = (Math.random() - 0.5) * 2 - gameSpeed * 0.3;
+    this.speedY = (Math.random() - 0.5) * 1.5;
+    this.alpha = 1;
   }
 
   update() {
@@ -66,269 +55,250 @@ class Particle {
   }
 }
 
-// Renderização das Árvores Realistas com Perspectiva
-function draw3DTree(worldX, worldZ) {
-  let p = project(worldX, 100, worldZ);
-  if (p.scale <= 0 || p.y < HORIZON_Y) return;
-
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(p.scale, p.scale);
-
-  // 1. Sombra da árvore no chão
-  let shadowGrad = ctx.createRadialGradient(-10, 40, 5, 0, 40, 60);
-  shadowGrad.addColorStop(0, "rgba(0, 0, 0, 0.45)");
-  shadowGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
-  ctx.fillStyle = shadowGrad;
-  ctx.beginPath();
-  ctx.ellipse(-10, 40, 55, 20, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 2. Tronco Texturizado em 3D
-  let trunkGrad = ctx.createLinearGradient(-12, 0, 12, 0);
-  trunkGrad.addColorStop(0, "#451a03");
-  trunkGrad.addColorStop(0.5, "#78350f");
-  trunkGrad.addColorStop(1, "#270e02");
-  ctx.fillStyle = trunkGrad;
-  ctx.beginPath();
-  ctx.moveTo(-10, 40);
-  ctx.lineTo(-6, -30);
-  ctx.lineTo(6, -30);
-  ctx.lineTo(10, 40);
-  ctx.fill();
-
-  // 3. Copa da Folhagem em Camadas
-  let foliageGrad = ctx.createRadialGradient(-15, -90, 10, 0, -70, 70);
-  foliageGrad.addColorStop(0, "#34d399");
-  foliageGrad.addColorStop(0.5, "#059669");
-  foliageGrad.addColorStop(1, "#022c22");
-
-  ctx.fillStyle = foliageGrad;
-
-  // Lóbulos folhosos
-  const clusters = [
-    { x: 0, y: -90, r: 48 },
-    { x: -25, y: -70, r: 38 },
-    { x: 25, y: -70, r: 38 },
-    { x: -18, y: -105, r: 30 },
-    { x: 18, y: -105, r: 30 }
-  ];
-
-  clusters.forEach(c => {
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  ctx.restore();
-}
-
-// Classe dos Jogadores
+// Classe do Jogador 2D Lateral
 class Player {
-  constructor(xOffset, gender, shirtColor, hairColor, controls) {
-    this.xOffset = xOffset; // Posição horizontal no mundo 3D (-200 a 200)
-    this.worldZ = 40;       // Posição fixa perto da câmera
+  constructor(x, gender, shirtColor, hairColor, controls) {
+    this.startX = x;
+    this.x = x;
+    this.baseY = 350;
+    this.y = this.baseY;
+    this.width = 30;
+    this.height = 68;
+
     this.gender = gender;
     this.shirtColor = shirtColor;
+    this.pantsColor = "#1e293b";
     this.hairColor = hairColor;
     this.skinColor = "#f0b088";
     this.controls = controls;
 
-    this.jumpY = 0;
     this.vy = 0;
-    this.gravity = 0.8;
+    this.gravity = 0.75;
+    this.speed = 5;
 
     this.isJumping = false;
     this.isCrouching = false;
     this.alive = true;
+
     this.animFrame = 0;
   }
 
   update() {
     if (!this.alive) return;
 
-    // Controles
+    // Pulo
     if (keys[this.controls.jump] && !this.isJumping) {
-      this.vy = -14;
+      this.vy = -14.5;
       this.isJumping = true;
     }
 
+    // Agachar
     if (keys[this.controls.crouch] && !this.isJumping) {
       this.isCrouching = true;
+      this.height = 38;
+      this.y = this.baseY + 30;
     } else {
-      this.isCrouching = false;
-    }
-
-    if (keys[this.controls.left]) this.xOffset -= 8;
-    if (keys[this.controls.right]) this.xOffset += 8;
-
-    // Limites de pista
-    if (this.xOffset < -180) this.xOffset = -180;
-    if (this.xOffset > 180) this.xOffset = 180;
-
-    // Física do Pulo
-    if (this.isJumping) {
-      this.jumpY += this.vy;
-      this.vy += this.gravity;
-
-      if (this.jumpY >= 0) {
-        this.jumpY = 0;
-        this.vy = 0;
-        this.isJumping = false;
+      if (this.isCrouching) {
+        this.height = 68;
+        this.y = this.baseY;
+        this.isCrouching = false;
       }
     }
 
-    // Poeira ao correr
-    if (!this.isJumping && Math.random() > 0.4) {
-      let p = project(this.xOffset, 120, this.worldZ);
-      particles.push(new Particle(p.x, p.y + 10, "rgba(217, 119, 6, 0.6)"));
+    // Movimentação Lateral
+    if (keys[this.controls.left]) this.x -= this.speed;
+    if (keys[this.controls.right]) this.x += this.speed;
+
+    // Limites de tela
+    if (this.x < 10) this.x = 10;
+    if (this.x + this.width > canvas.width - 10) this.x = canvas.width - this.width - 10;
+
+    // Gravidade
+    this.y += this.vy;
+    this.vy += this.gravity;
+
+    const currentBaseY = this.isCrouching ? this.baseY + 30 : this.baseY;
+    if (this.y >= currentBaseY) {
+      this.y = currentBaseY;
+      this.vy = 0;
+      this.isJumping = false;
+
+      // Poeira ao correr no chão
+      if (Math.random() > 0.4) {
+        particles.push(new Particle(this.x + 5, 418, "rgba(200, 180, 150, 0.6)"));
+      }
     }
 
-    this.animFrame += 0.2;
+    this.animFrame += gameSpeed * 0.08;
   }
 
   draw() {
     if (!this.alive) return;
 
-    let p = project(this.xOffset, 120 + this.jumpY, this.worldZ);
-    let shadowP = project(this.xOffset, 120, this.worldZ);
+    const px = this.x;
+    const py = this.y;
+    const swing = Math.sin(this.animFrame) * (this.isJumping ? 0.2 : 0.7);
 
+    // Sombra suave no chão
     ctx.save();
-
-    // 1. Sombra Projetada no Chão
-    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
     ctx.beginPath();
-    ctx.ellipse(shadowP.x, shadowP.y + 12, 22 * shadowP.scale, 7 * shadowP.scale, 0, 0, Math.PI * 2);
+    ctx.ellipse(px + 15, 420, 20, 5, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.translate(p.x, p.y);
-    ctx.scale(p.scale * 1.3, p.scale * 1.3);
-
-    const swing = Math.sin(this.animFrame) * 10;
+    ctx.restore();
 
     if (this.isCrouching) {
-      // Agachado
-      ctx.fillStyle = this.shirtColor;
-      ctx.beginPath();
-      ctx.roundRect(-16, -10, 32, 20, 6);
-      ctx.fill();
-
-      let skinGrad = ctx.createRadialGradient(0, -18, 2, 0, -18, 10);
-      skinGrad.addColorStop(0, "#ffdfca");
-      skinGrad.addColorStop(1, this.skinColor);
-      ctx.fillStyle = skinGrad;
-      ctx.beginPath();
-      ctx.arc(0, -18, 10, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = this.hairColor;
-      ctx.beginPath();
-      ctx.arc(0, -20, 11, Math.PI, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // Em pé / Correndo de costas para o horizonte
-      // Pernas
-      ctx.strokeStyle = "#1e293b";
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(-6, 0);
-      ctx.lineTo(-8, 22 + swing * 0.5);
-      ctx.moveTo(6, 0);
-      ctx.lineTo(8, 22 - swing * 0.5);
-      ctx.stroke();
-
-      // Tronco
-      let shirtGrad = ctx.createLinearGradient(-14, -30, 14, 0);
+      // --- PERSONAGEM AGACHADO 2D ---
+      let shirtGrad = ctx.createLinearGradient(px, py + 15, px + 25, py + 30);
       shirtGrad.addColorStop(0, this.shirtColor);
-      shirtGrad.addColorStop(1, "#0f172a");
+      shirtGrad.addColorStop(1, "#111");
       ctx.fillStyle = shirtGrad;
       ctx.beginPath();
-      ctx.roundRect(-14, -32, 28, 32, 5);
+      ctx.roundRect(px + 5, py + 15, 24, 15, 4);
       ctx.fill();
 
-      // Cabeça (Vista de Costas/3/4)
-      let skinGrad = ctx.createRadialGradient(-2, -42, 2, 0, -42, 10);
-      skinGrad.addColorStop(0, "#ffdfca");
-      skinGrad.addColorStop(1, this.skinColor);
-      ctx.fillStyle = skinGrad;
+      // Cabeça
+      ctx.fillStyle = this.skinColor;
       ctx.beginPath();
-      ctx.arc(0, -42, 10, 0, Math.PI * 2);
+      ctx.arc(px + 20, py + 8, 9, 0, Math.PI * 2);
       ctx.fill();
 
       // Cabelo
       ctx.fillStyle = this.hairColor;
       ctx.beginPath();
-      ctx.arc(0, -44, 11, 0, Math.PI * 2);
+      ctx.arc(px + 17, py + 5, 9, Math.PI * 0.8, Math.PI * 2.1);
       ctx.fill();
 
+      // Pernas Dobradas
+      ctx.fillStyle = this.pantsColor;
+      ctx.beginPath();
+      ctx.roundRect(px + 2, py + 28, 26, 10, 3);
+      ctx.fill();
+    } else {
+      // --- PERSONAGEM EM PÉ / CORRENDO 2D ---
+
+      // 1. Cabelo Longo (Feminino)
       if (this.gender === "female") {
-        // Rabo de Cavalo Balançando
+        ctx.fillStyle = this.hairColor;
         ctx.beginPath();
-        ctx.arc(swing * 0.4, -36, 6, 0, Math.PI * 2);
+        ctx.arc(px + 4 - Math.sin(swing) * 5, py + 15, 7, 0, Math.PI * 2);
         ctx.fill();
       }
-    }
 
-    ctx.restore();
+      // 2. Pernas Articuladas
+      ctx.lineWidth = 6;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = this.pantsColor;
+
+      // Perna Traseira
+      ctx.beginPath();
+      ctx.moveTo(px + 15, py + 38);
+      ctx.lineTo(px + 15 - Math.sin(swing) * 16, py + 52);
+      ctx.lineTo(px + 15 - Math.sin(swing) * 16 + 5, py + 63);
+      ctx.stroke();
+
+      // Perna Dianteira
+      ctx.beginPath();
+      ctx.moveTo(px + 15, py + 38);
+      ctx.lineTo(px + 15 + Math.sin(swing) * 16, py + 52);
+      ctx.lineTo(px + 15 + Math.sin(swing) * 16 + 5, py + 63);
+      ctx.stroke();
+
+      // Sapatos
+      ctx.fillStyle = "#111";
+      ctx.fillRect(px + 15 - Math.sin(swing) * 16 + 3, py + 61, 8, 5);
+      ctx.fillRect(px + 15 + Math.sin(swing) * 16 + 3, py + 61, 8, 5);
+
+      // 3. Tronco e Camisa
+      let shirtGrad = ctx.createLinearGradient(px + 8, py + 18, px + 22, py + 38);
+      shirtGrad.addColorStop(0, this.shirtColor);
+      shirtGrad.addColorStop(1, "#0f172a");
+      ctx.fillStyle = shirtGrad;
+      ctx.beginPath();
+      ctx.roundRect(px + 7, py + 18, 16, 22, 4);
+      ctx.fill();
+
+      // 4. Cabeça
+      ctx.fillStyle = this.skinColor;
+      ctx.beginPath();
+      ctx.arc(px + 15, py + 10, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cabelo
+      ctx.fillStyle = this.hairColor;
+      ctx.beginPath();
+      ctx.arc(px + 14, py + 8, 10.5, Math.PI * 0.75, Math.PI * 1.95);
+      ctx.fill();
+
+      // Olho
+      ctx.fillStyle = "#0f172a";
+      ctx.fillRect(px + 20, py + 8, 2, 3);
+
+      // 5. Braços
+      ctx.strokeStyle = this.skinColor;
+      ctx.lineWidth = 4;
+
+      ctx.beginPath();
+      ctx.moveTo(px + 15, py + 21);
+      ctx.lineTo(px + 15 - Math.cos(swing) * 14, py + 33);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(px + 15, py + 21);
+      ctx.lineTo(px + 15 + Math.cos(swing) * 14, py + 33);
+      ctx.stroke();
+    }
   }
 }
 
-// Obstáculos em 3D vindo do Horizonte
+// Obstáculos em 2D Lateral
 class Obstacle {
   constructor() {
-    this.xOffset = (Math.random() - 0.5) * 300;
-    this.worldZ = 600; // Surge distante no horizonte
+    this.x = canvas.width;
     this.type = Math.random() > 0.4 ? "ground" : "air"; // Ground = Pular, Air = Agachar
-    this.width = 70;
-    this.height = this.type === "ground" ? 35 : 28;
+    this.width = 38;
+    this.height = this.type === "ground" ? 48 : 38;
+    this.y = this.type === "ground" ? 372 : 305;
   }
 
   update() {
-    this.worldZ -= gameSpeed * FOV; // Avança em direção à câmera
+    this.x -= gameSpeed;
   }
 
   draw() {
-    let p = project(this.xOffset, 120, this.worldZ);
-    if (p.scale <= 0 || p.y < HORIZON_Y) return;
-
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.scale(p.scale, p.scale);
-
     if (this.type === "ground") {
-      // Barreira de Pedra
-      let stoneGrad = ctx.createLinearGradient(-this.width / 2, -this.height, this.width / 2, 0);
-      stoneGrad.addColorStop(0, "#cbd5e1");
-      stoneGrad.addColorStop(1, "#334155");
+      // Pedra no Chão
+      let rockGrad = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
+      rockGrad.addColorStop(0, "#94a3b8");
+      rockGrad.addColorStop(1, "#1e293b");
 
-      ctx.fillStyle = stoneGrad;
+      ctx.fillStyle = rockGrad;
       ctx.beginPath();
-      ctx.roundRect(-this.width / 2, -this.height, this.width, this.height, 6);
+      ctx.roundRect(this.x, this.y, this.width, this.height, 6);
       ctx.fill();
     } else {
-      // Tronco Suspenso (Agachar)
-      ctx.fillStyle = "#78350f";
-      ctx.fillRect(-this.width / 2, -this.height - 40, this.width, this.height);
+      // Tronco Aéreo / Suspenso
+      let woodGrad = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+      woodGrad.addColorStop(0, "#d97706");
+      woodGrad.addColorStop(1, "#451a03");
 
-      // Suportes laterais
-      ctx.fillStyle = "#451a03";
-      ctx.fillRect(-this.width / 2, -this.height - 40, 8, 55);
-      ctx.fillRect(this.width / 2 - 8, -this.height - 40, 8, 55);
+      ctx.fillStyle = woodGrad;
+      ctx.beginPath();
+      ctx.roundRect(this.x, this.y, this.width, this.height, 6);
+      ctx.fill();
     }
-
-    ctx.restore();
   }
 }
 
 // Instâncias dos Jogadores
-const player1 = new Player(-60, "female", "#ec4899", "#3b0764", {
+const player1 = new Player(120, "female", "#ec4899", "#3b0764", {
   jump: "KeyW",
   crouch: "KeyS",
   left: "KeyA",
   right: "KeyD"
 });
 
-const player2 = new Player(60, "male", "#0284c7", "#eab308", {
+const player2 = new Player(180, "male", "#0284c7", "#eab308", {
   jump: "ArrowUp",
   crouch: "ArrowDown",
   left: "ArrowLeft",
@@ -338,110 +308,76 @@ const player2 = new Player(60, "male", "#0284c7", "#eab308", {
 let obstacles = [];
 let obstacleTimer = 0;
 
-// Checagem de Colisão 3D
-function checkCollision(player, obs) {
-  // Apenas checa colisão quando o obstáculo atinge a zona do jogador
-  if (Math.abs(obs.worldZ - player.worldZ) < 25) {
-    const horizontalHit = Math.abs(obs.xOffset - player.xOffset) < 45;
-
-    if (horizontalHit) {
-      if (obs.type === "ground" && player.jumpY > -20) {
-        return true; // Não pulou
-      }
-      if (obs.type === "air" && !player.isCrouching) {
-        return true; // Não agachou
-      }
-    }
-  }
-  return false;
+// Checagem de Colisão AABB
+function checkCollision(player, obstacle) {
+  return (
+    player.x < obstacle.x + obstacle.width &&
+    player.x + player.width > obstacle.x &&
+    player.y < obstacle.y + obstacle.height &&
+    player.y + player.height > obstacle.y
+  );
 }
 
-// Desenhar o Cenário Perspectivo / Linha do Horizonte
+// Renderização do Fundo 2D com Parallax
 function drawBackground() {
-  // 1. Céu do Horizonte
-  let skyGrad = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
+  // Céu
+  let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
   skyGrad.addColorStop(0, "#0284c7");
-  skyGrad.addColorStop(0.7, "#38bdf8");
+  skyGrad.addColorStop(0.6, "#38bdf8");
   skyGrad.addColorStop(1, "#bae6fd");
   ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, canvas.width, HORIZON_Y);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Sol no Horizonte
-  let sunGrad = ctx.createRadialGradient(canvas.width / 2, HORIZON_Y, 5, canvas.width / 2, HORIZON_Y, 80);
-  sunGrad.addColorStop(0, "rgba(253, 224, 71, 0.9)");
-  sunGrad.addColorStop(0.4, "rgba(251, 146, 60, 0.4)");
-  sunGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
-  ctx.fillStyle = sunGrad;
+  // Sol
+  ctx.fillStyle = "#fef08a";
   ctx.beginPath();
-  ctx.arc(canvas.width / 2, HORIZON_Y, 80, 0, Math.PI * 2);
+  ctx.arc(750, 80, 40, 0, Math.PI * 2);
   ctx.fill();
 
-  // Montanhas Distantes no Horizonte
-  ctx.fillStyle = "#1e293b";
-  ctx.beginPath();
-  ctx.moveTo(0, HORIZON_Y);
-  ctx.lineTo(150, HORIZON_Y - 40);
-  ctx.lineTo(300, HORIZON_Y);
-  ctx.lineTo(500, HORIZON_Y - 60);
-  ctx.lineTo(700, HORIZON_Y);
-  ctx.lineTo(900, HORIZON_Y - 35);
-  ctx.lineTo(canvas.width, HORIZON_Y);
-  ctx.fill();
+  // Camada 1: Montanhas Distantes (Parallax Lento)
+  bgOffset1 -= gameSpeed * 0.15;
+  if (bgOffset1 <= -450) bgOffset1 = 0;
 
-  // 2. Terreno de Grama (Abaixo do Horizonte)
-  let groundGrad = ctx.createLinearGradient(0, HORIZON_Y, 0, canvas.height);
-  groundGrad.addColorStop(0, "#15803d");
-  groundGrad.addColorStop(1, "#052e16");
-  ctx.fillStyle = groundGrad;
-  ctx.fillRect(0, HORIZON_Y, canvas.width, canvas.height - HORIZON_Y);
-
-  // 3. Pista 3D Convergindo para o Ponto de Fuga no Horizonte
-  roadZ = (roadZ + gameSpeed * FOV) % 80;
-
-  let pFarLeft = project(-100, 120, 600);
-  let pFarRight = project(100, 120, 600);
-  let pNearLeft = project(-220, 120, 20);
-  let pNearRight = project(220, 120, 20);
-
-  // Pista Principal
-  ctx.fillStyle = "#d97706";
-  ctx.beginPath();
-  ctx.moveTo(pFarLeft.x, pFarLeft.y);
-  ctx.lineTo(pFarRight.x, pFarRight.y);
-  ctx.lineTo(pNearRight.x, pNearRight.y);
-  ctx.lineTo(pNearLeft.x, pNearLeft.y);
-  ctx.fill();
-
-  // Faixa Central da Pista em Profundidade
-  ctx.strokeStyle = "#fef08a";
-  ctx.lineWidth = 3;
-  for (let z = 600; z > 20; z -= 80) {
-    let currentZ = z - roadZ;
-    if (currentZ < 20) continue;
-
-    let p1 = project(0, 120, currentZ);
-    let p2 = project(0, 120, Math.max(20, currentZ - 40));
-
+  ctx.fillStyle = "#64748b";
+  for (let i = 0; i < 3; i++) {
     ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
+    ctx.moveTo(bgOffset1 + i * 450, 420);
+    ctx.lineTo(bgOffset1 + i * 450 + 225, 180);
+    ctx.lineTo(bgOffset1 + i * 450 + 450, 420);
+    ctx.fill();
   }
 
-  // 4. Fileiras de Árvores Realistas nas Laterais do Horizonte
-  for (let z = 600; z >= 30; z -= 90) {
-    let treeZ = z - roadZ;
-    if (treeZ > 20 && treeZ < 650) {
-      draw3DTree(-260, treeZ); // Esquerda
-      draw3DTree(260, treeZ);  // Direita
-    }
+  // Camada 2: Árvores em 2D (Parallax Médio)
+  bgOffset2 -= gameSpeed * 0.4;
+  if (bgOffset2 <= -200) bgOffset2 = 0;
+
+  for (let i = 0; i < 6; i++) {
+    let treeX = bgOffset2 + i * 200 + 20;
+
+    // Tronco
+    ctx.fillStyle = "#78350f";
+    ctx.fillRect(treeX + 14, 260, 12, 160);
+
+    // Folhagem
+    ctx.fillStyle = "#15803d";
+    ctx.beginPath();
+    ctx.arc(treeX + 20, 240, 35, 0, Math.PI * 2);
+    ctx.fill();
   }
+
+  // Chão
+  ctx.fillStyle = "#334155";
+  ctx.fillRect(0, 420, canvas.width, 60);
+
+  // Faixa do topo do chão
+  ctx.fillStyle = "#22c55e";
+  ctx.fillRect(0, 420, canvas.width, 6);
 }
 
 // Loop Principal
 function gameLoop() {
   if (gameOver) {
-    ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+    ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.fillStyle = "#f59e0b";
@@ -457,32 +393,36 @@ function gameLoop() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Renderiza Fundo 3D e Horizonte
+  // Renderiza Cenário
   drawBackground();
 
-  // Atualiza Partículas
+  // Partículas
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update();
     particles[i].draw();
     if (particles[i].alpha <= 0) particles.splice(i, 1);
   }
 
-  // Pontuação e Aumento Gradual de Velocidade
+  // Pontuação e Velocidade
   score += 0.1;
-  gameSpeed += 0.000005;
+  gameSpeed += 0.0006;
 
   if (player1.alive) score1El.textContent = Math.floor(score);
   if (player2.alive) score2El.textContent = Math.floor(score);
 
-  // Atualiza e Renderiza Obstáculos
+  // Jogadores
+  player1.update();
+  player1.draw();
+
+  player2.update();
+  player2.draw();
+
+  // Obstáculos
   obstacleTimer++;
-  if (obstacleTimer > Math.max(35, 90 - gameSpeed * 1000)) {
+  if (obstacleTimer > Math.max(48, 105 - gameSpeed * 3.5)) {
     obstacles.push(new Obstacle());
     obstacleTimer = 0;
   }
-
-  // Ordena os obstáculos para desenhar do mais distante ao mais próximo (Depth Sorting)
-  obstacles.sort((a, b) => b.worldZ - a.worldZ);
 
   for (let i = obstacles.length - 1; i >= 0; i--) {
     let obs = obstacles[i];
@@ -492,20 +432,12 @@ function gameLoop() {
     if (player1.alive && checkCollision(player1, obs)) player1.alive = false;
     if (player2.alive && checkCollision(player2, obs)) player2.alive = false;
 
-    // Remove obstáculo após passar da câmera
-    if (obs.worldZ < 10) {
+    if (obs.x + obs.width < 0) {
       obstacles.splice(i, 1);
     }
   }
 
-  // Atualiza e Desenha Jogadores
-  player1.update();
-  player1.draw();
-
-  player2.update();
-  player2.draw();
-
-  // Condição de Fim de Jogo
+  // Fim do jogo se ambos morrerem
   if (!player1.alive && !player2.alive) {
     gameOver = true;
   }
